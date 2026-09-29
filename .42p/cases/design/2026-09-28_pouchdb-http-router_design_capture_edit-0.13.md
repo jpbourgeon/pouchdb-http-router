@@ -2,7 +2,7 @@
 
 ## 1. Identité, finalité et portée du change
 
-Cette Capture concerne le reboot architectural de `pouchdb-http-router`. Elle conserve l'état de design nécessaire pour reconstruire ultérieurement `docs/design/README.md`, `contract.md`, `architecture.md`, `environment.md` et `decisions.md`.
+Cette Capture concerne le reboot architectural de `pouchdb-http-router`. Elle conserve l'état de design nécessaire pour reconstruire ultérieurement `docs/design/README.md`, `contract.md`, `architecture.md`, `environment.md`, `verification.md` et `decisions.md`.
 
 La Capture est une projection de travail non normative. Elle n'institue ni identifiant ni étape OpenSpec. Les futurs documents de design devront être relus et institués séparément.
 
@@ -14,13 +14,14 @@ Le nom courant `pouchdb-http-router` décrit le mécanisme sans élargir le cont
 
 La documentation cible doit séparer les responsabilités suivantes :
 
-- `contract.md` fixe le problème résolu, la surface garantie, les non-objectifs et les propriétés attendues ;
-- `architecture.md` décrit la structure qui réalise ce contrat et ses invariants internes ;
-- `environment.md` décrit l'enveloppe d'exécution, les intégrations, les preuves et les conditions de benchmark ;
-- `decisions.md` conserve les arbitrages, alternatives écartées, hypothèses jusqu'à falsification et compromis ;
-- `README.md` indexe ces quatre documents, explique leur articulation et indique où se trouve chaque information normative.
+- `README.md` est le point d'entrée et la carte d'autorité du corpus de design ; il indexe les cinq documents spécialisés, explique leur articulation et indique où se trouve chaque information normative ;
+- `contract.md` fixe le problème résolu, la surface de synchronisation garantie, les frontières, les non-objectifs et les propriétés attendues ;
+- `architecture.md` décrit la structure du système qui réalise ce contrat et ses invariants internes ;
+- `environment.md` décrit l'enveloppe d'exécution, les conditions d'intégration et les responsabilités de l'environnement hôte ;
+- `verification.md` décrit la stratégie de vérification, les preuves fonctionnelles, les tests ciblés, les obligations de preuve ainsi que la méthode et les conditions de benchmark ;
+- `decisions.md` conserve les décisions de design, leur rationale, les compromis, les alternatives écartées et les hypothèses retenues jusqu'à falsification.
 
-La suite de tests prouve certains comportements, mais ne définit pas le contrat des futurs documents de design.
+La suite de tests prouve certains comportements, mais ne définit pas le contrat des futurs documents de design. `verification.md` explicite cette relation de preuve ; il ne devient pas une seconde source du contrat.
 
 ## 3. Critères et contraintes matériels
 
@@ -178,7 +179,9 @@ La création implicite d'une base absente est tranchée par R-DB-CREATION et R-D
 
 Next.js, React et les conventions catch-all ne font pas partie du reboot. CORS, Helmet, authentification générique, rate limiting et observabilité applicative appartiennent à l'application hôte ou au reverse proxy, pas au routeur ni aux intégrations de benchmark.
 
-## 7. Environnement, validation et benchmark
+## 7. Environnement et vérification à reconstruire
+
+R-RUNTIME alimente `environment.md`. R-VALIDATION et R-BENCHMARK alimentent `verification.md`, y compris les preuves fonctionnelles, tests ciblés, obligations de preuve, méthodes et conditions de benchmark ; ces matières ne relèvent plus de `environment.md`.
 
 ### R-RUNTIME — Enveloppe courante
 
@@ -216,6 +219,8 @@ Le développement local valide seulement le harness par un passage ou un sous-en
 
 ## 8. Arbitrages structurants à préserver dans `decisions.md`
 
+Les arbitrages de cette section et leur rationale appartiennent à `decisions.md`. Pour R-PROOF et R-PERF-METHOD, `decisions.md` conserve le pourquoi et les alternatives écartées, tandis que la stratégie de preuve et le protocole de benchmark résultants appartiennent à `verification.md`.
+
 **R-BOUNDARY — `node:http` plutôt que Web `Request`/`Response`.** Une abstraction Web universelle aurait ajouté conversions et couches alors que PouchDB serveur est aujourd'hui Node. Le handler natif couvre Node et Express directement et reste l'hypothèse la plus simple jusqu'à falsification.
 
 **R-NO-EXPRESS-WRAPPER — Montage direct plutôt qu'intégration logicielle.** Express accepte les objets Node et le handler. Les exemples, tests et benchmarks suffisent tant qu'aucun besoin réel de wrapper n'apparaît.
@@ -252,7 +257,7 @@ L'arbitrage **R-BULK-GET-FALLBACK** accepte deux routes de lecture supplémentai
 
 **S-EXPLORATION — source primaire désignée.** `ChatGPT-EXPL_-_Specs.md`, conversation fournie le 2026-09-27, contient les repères A1 à A93, dont A93, estimation intermédiaire remplacée par D1. Elle mêle décisions humaines et propositions du modèle : seules les adoptions explicites, les conséquences nécessaires des éléments déjà établis ou les preuves indépendantes fondent le design courant. Les positions finales A89/A92 remplacent l'orientation API-first A72-A80.
 
-**S-CODE — evidence technique rapportée dans S-EXPLORATION.** Code courant et historique de `jpbourgeon/pouchdb-http-router`/ancien nom, notamment routage, hooks, `_changes`, dépendances, harness et benchmarks. Le dépôt `main` ne contient pas encore les cinq documents de design cibles ni une Capture existante identifiée.
+**S-CODE — evidence technique rapportée dans S-EXPLORATION.** Code courant et historique de `jpbourgeon/pouchdb-http-router`/ancien nom, notamment routage, hooks, `_changes`, dépendances, harness et benchmarks. Le dépôt `main` ne contient pas encore les six documents de design cibles ni une Capture existante identifiée.
 
 **S-POUCHDB — evidence amont rapportée dans S-EXPLORATION.** Replicator, adapter HTTP, preset/plugins standards et suites PouchDB courants ; ils fondent l'inventaire sync, les fallbacks, les limites de la suite et l'absence de besoin multipart actuel.
 
