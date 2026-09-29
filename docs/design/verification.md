@@ -1,6 +1,6 @@
 # Verification
 
-This document defines the evidence required to show that an implementation satisfies the [product and protocol contract](contract.md), preserves the necessary [architectural invariants](architecture.md), and operates under the conditions in [environment.md). Tests prove the published design; implementation behavior does not create requirements.
+This document defines the evidence required to show that an implementation satisfies the [product and protocol contract](contract.md), preserves the necessary [architectural invariants](architecture.md), and operates under the conditions in the [environment](environment.md). Tests prove the published design; implementation behavior does not create requirements.
 
 ## Verification objective
 
@@ -45,7 +45,7 @@ The suite covers at least these use cases:
 | live replication | changes made after startup propagate through repeated longpoll requests, with heartbeat, timeout, and cancellation behavior exercised |
 | conflicts | conflicting revision branches and their reported outcomes match the equivalent direct synchronization |
 | attachments | document and design-document attachments retain their binary content, including attachment identifiers containing `/` |
-| filters | `doc_ids`, selector, named, and `_view` filters select the expected changes; function filters remain a client-side PouchDB behavior |
+| filters | `doc_ids`, selector, named, and `_view` filters select the expected changes. Named and `_view` cases must demonstrate source-side evaluation through the local design document without a remote `_view` request; function filters remain a client-side PouchDB behavior |
 | checkpoints | source, target, and disabled-checkpoint configurations use the expected local-document behavior and resume consistently |
 
 The suite also observes the HTTP dialogue required to establish which protocol path produced the result. Assertions made only against final database state are insufficient when another route or fallback could have produced the same state.
@@ -56,14 +56,14 @@ Targeted evidence complements the end-to-end suite as follows.
 
 | Proof area | Required evidence |
 | --- | --- |
-| V1 route surface | Exercise all thirteen route forms, both database trailing-slash forms, reserved `_local` and `_design` precedence, and method distinctions. Representative excluded routes must not be classified as V1 synchronization operations; no response status is implied where the contract specifies none. |
+| V1 route surface | Exercise all thirteen route forms, both database trailing-slash forms, reserved `_local` and `_design` precedence, method distinctions, and the PouchDB adapter's database-URL fallback when `GET /` is unavailable. Representative excluded routes must not be classified as V1 synchronization operations; no response status is implied where the contract specifies none. |
 | `_bulk_get` and fallback | Demonstrate that a functional bulk-read path actually issues `_bulk_get` without entering the document shim. Separately force its failure and demonstrate fallback through both ordinary and design-document reads. The PouchDB client's per-base-URL memory of `_bulk_get` support must be isolated or made explicit. |
 | Path encoding | Exercise encoded database, document, design-document, local-document, and attachment identifiers. Assert that encoded identifier content does not alter route structure and that attachment identifiers preserve all `/` segments. |
 | Database existence and creation | Verify absent, pre-existing, newly created, and indeterminate databases; the `GET`/404 → `PUT`/201 setup; repeated creation yielding 412; non-creation routes returning 404 for known absence; storage errors not being converted to absence; and `skip_setup` not creating a database. Direct HTTP assertions are required because a client API may mask a 404. |
 | Concurrent creation | Show that two same-name creations handled by one router instance cannot both report 201 and that a dependent read waits for the in-progress result. Separate router instances must not be treated as sharing this coordination. |
 | Hooks | Cover declared order, asynchronous hooks, parsing before `before`, short-circuiting before PouchDB access, shared request state, transformed final targets, stable operation identities and parameter vocabulary, phase-dependent context fields, normalized expected PouchDB errors, and application policy applied to the final transformed target. |
 | Semantic responses | Exercise every public body form—JSON object, array, `null`, `Buffer`, string, and `undefined`—and both direct response mutation and complete replacement across ordered `after` hooks. |
-| HTTP commitment | Prove unrestricted transformation before commitment and the status, header, and payload restrictions after commitment. An incompatible late transformation must be rejected. A representative failure after commitment must terminate the transport rather than emit a replacement status; tests must not require `after` after an unrecoverable transport failure or client disconnection. |
+| HTTP commitment | Prove that `committed` is read-only, that transformation is unrestricted before commitment, and that status, header, and payload restrictions apply after commitment. An incompatible late transformation must be rejected. A representative failure after commitment must terminate the transport rather than emit a replacement status; tests must not require `after` after an unrecoverable transport failure or client disconnection. |
 | Request-size boundary | Verify the 64 MiB default, a valid configured limit, rejection of invalid configuration, successful parsing above any lower parser default, and HTTP 413 on overflow. Overflow must occur before hooks and PouchDB access. |
 | Handle lifecycle | With an instrumented PouchDB constructor, prove per-database handle reuse, invalidation on `closed` and `destroyed`, reopening after invalidation, preservation of a replacement against stale events, and no invalidation for an ordinary operation error. |
 | Long-lived `_changes` work | Verify longpoll heartbeat and timeout behavior, cancellation on client disconnection, and release of the feed and associated timers. |
@@ -96,7 +96,7 @@ The benchmark uses the real PouchDB replicator and three targets:
 | B | the new router under Express |
 | C | the same new handler under native `node:http` |
 
-The initial workloads are initial pull replication, initial push replication, and incremental bidirectional synchronization with checkpoints. Live replication, filters, conflicts, and attachments remain functional cases unless a specific performance question justifies adding them.
+The initial workloads are initial pull replication, initial push replication, and incremental bidirectional synchronization with checkpoints. Live replication, filters, conflicts, and attachments remain functional cases unless a specific performance question justifies adding them. Workload volumes are calibrated for stable measurement without excessive duration and are published with the results; the design does not prescribe fixed volumes.
 
 ### Comparative interpretation
 
