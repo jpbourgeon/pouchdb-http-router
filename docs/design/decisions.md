@@ -48,7 +48,7 @@ Several HTTP forms can represent the same operation, and transport spelling may 
 
 V1 uses ordered `before` and `after` hooks rather than specialized hook families, route-filter DSLs, or `skip*` controls.
 
-Two generic phases cover authorization, validation, instrumentation, and response transformation without multiplying extension APIs. A single request context allows hooks to cooperate, while semantic operation identity prevents coupling to routes. The mutable semantic response remains separate from read-only `committed` transport state because a replaceable object cannot reverse headers already emitted by a heartbeat.
+Two generic phases cover authorization, validation, instrumentation, filtering, and response transformation without multiplying extension APIs. A single request context allows hooks to cooperate, while semantic operation identity prevents coupling to routes. The mutable semantic response remains separate from read-only `committed` transport state because a replaceable object cannot reverse headers already emitted by a heartbeat.
 
 The tradeoff is that hooks are trusted in-process code whose order and mutations matter. Once transport state is committed, `after` cannot offer the same transformation freedom as it can before commitment.
 
@@ -104,7 +104,7 @@ The tradeoff is maintaining a focused suite and explicit contract traceability. 
 
 ## Decomposed performance comparison
 
-Performance evidence uses three targets: the previous Express router, the new router under Express, and the same new handler under native `node:http`.
+Performance evidence uses three targets: `pouchdb-express-router` under Express, the new router under Express, and the same new handler under native `node:http`.
 
 This decomposition separates the effect of replacing the router from the effect of removing the Express envelope. A single old-versus-new comparison would confound both, while revision-reading workloads may also include the protocol benefit of `_bulk_get`. The tradeoff is a more demanding benchmark campaign, but one whose comparisons have interpretable causes. It establishes comparative evidence, not a quantitative product guarantee.
 
