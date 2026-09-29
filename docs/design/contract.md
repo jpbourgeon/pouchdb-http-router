@@ -83,12 +83,15 @@ Checkpoint placement options and disabled checkpoints do not add routes beyond t
 
 ### Request hooks
 
-V1 exposes ordered `before` and `after` hooks as trusted application extension points. Hooks may be asynchronous and run sequentially in declared order. Each request carries a stable semantic operation identity that does not depend on the matched route spelling.
+V1 exposes ordered `before` and `after` hooks as trusted application extension points. Hooks may be asynchronous, run sequentially in declared order, and share one request context.
 
-`before` runs after request parsing and before any PouchDB access for that request. It may transform the request context, including the database target and operation parameters, or return a response that short-circuits the remaining `before` hooks and the PouchDB operation. The `after` hooks observe the resulting semantic response, whether it came from that short circuit or the PouchDB operation, and may transform it.
+The public context exposes `req`, immutable `operation`, `database`, `params`, `query`, `body`, request-scoped `state`, `db`, `response`, and read-only `committed`. The stable semantic `operation` identity is one of `database.info`, `database.create`, `changes.read`, `revisions.diff`, `documents.bulkRead`, `documents.bulkWrite`, `attachment.read`, `localDocument.read`, `localDocument.write`, or `document.read`. The public target and parameter vocabulary is `database`, `documentId`, `designId`, `attachmentId`, and `localId`; a design-document `documentId` has the form `_design/…`, and `attachmentId` preserves any `/` segments.
 
-Application policy, including authorization, must apply to the final target after any `before` transformations. A `before` refusal therefore prevents PouchDB access for that request.
+`before` runs after request parsing and before any PouchDB access for that request. It may transform the request context or return a response that short-circuits the remaining `before` hooks and the PouchDB operation. Application policy, including authorization, must apply to the final target after those transformations. A `before` refusal therefore prevents PouchDB access for that request.
 
+A hook may return `undefined` or a semantic response of the form `{ status, headers?, body? }`, with `status` required. The `after` hooks observe the resulting semantic response, whether it came from a `before` short circuit or the PouchDB operation, and may transform it. A complete response returned by `after` becomes the current response for subsequent `after` hooks.
+
+`committed` indicates that the HTTP status and headers are already fixed. When it is `false`, `after` may replace status, headers, and body. When it is `true`, status and headers cannot be replaced; `after` may change only payload not yet emitted and only in ways compatible with them. An incompatible change is rejected. If a late transport failure or client disconnection leaves no faithful semantic response possible, `after` is not guaranteed.
 ### Request-size boundary
 
 The public `bodyLimit` option controls the per-request limit for bodies parsed by the router and defaults to `64 MiB`. Exceeding it produces HTTP `413` before application hooks or PouchDB access for that request. Invalid `bodyLimit` configuration is rejected. No lower implicit parsing limit may silently replace the configured or default contract limit.
