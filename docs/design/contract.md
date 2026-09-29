@@ -60,14 +60,14 @@ The remaining synchronization routes do not implicitly create an absent database
 
 The normal PouchDB setup sequence may therefore be `GET` → `404` → `PUT` → `201`. If another request wins the creation race, PouchDB may receive and accept `412`. `skip_setup` does not create a database through this sequence.
 
-The public V1 storage boundary consists of:
+The public V1 storage inputs are:
 
 - `PouchDB: PouchDBConstructor`, the constructor or preset used to open databases;
 - `databaseExists: (name: string) => boolean | Promise<boolean>`, the application's logical-existence predicate for the database namespace it exposes.
 
-`databaseExists` does not create a database. It returns `false` only when absence is known. An inability to determine existence is an error and must not be converted into absence. The `name` passed to it is the final value of `context.database` after `before` hooks.
+`databaseExists` does not create a database. It returns `false` only when absence is known; inability to determine existence is an error and must not be converted into absence. The name supplied is the final database target after `before` hooks.
 
-The router does not discover every database by inspecting storage, maintain a universal database catalog, or compensate for inconsistent application knowledge. Concurrent creation of the same database is coordinated within one router instance: two concurrent `PUT /:database` requests handled by that instance must not both report `201`, and a concurrent read whose result depends on an in-progress creation waits for that outcome before determining existence. No cross-process or external-creator coordination is guaranteed.
+The router does not discover every database by inspecting storage, maintain a universal database catalog, or compensate for inconsistent application knowledge. Within one router instance, concurrent creation of the same database yields at most one `201`, and a dependent read waits for creation to finish. No cross-process or external-creator coordination is guaranteed.
 
 ### Bulk reads and fallback reads
 
@@ -83,31 +83,22 @@ Checkpoint placement options and disabled checkpoints do not add routes beyond t
 
 ### Request hooks
 
-V1 exposes ordered `before` and `after` hooks. Hooks may be asynchronous and are awaited sequentially in configuration order. They share one request context. The router parses the request body before running `before` hooks. A `before` hook can therefore refuse a parsed request before any PouchDB access for that request, while a parsing failure occurs before the hook.
+V1 exposes ordered `before` and `after` hooks as trusted application extension points. Hooks may be asynchronous and run sequentially in declared order. Each request carries a stable semantic operation identity that does not depend on the matched route spelling.
 
-The context exposes `req`, the semantic `operation`, `database`, `params`, `query`, `body`, request-scoped `state`, `db`, `response`, and read-only `committed`; it does not expose the raw response or route declaration. The immutable operation identifier describes PouchDB semantics rather than a route spelling and is one of `database.info`, `database.create`, `changes.read`, `revisions.diff`, `documents.bulkRead`, `documents.bulkWrite`, `attachment.read`, `localDocument.read`, `localDocument.write`, or `document.read`.
+`before` runs after request parsing and before any PouchDB access for that request. It may transform the request context, including the database target and operation parameters, or return a response that short-circuits the remaining `before` hooks and the PouchDB operation. The `after` hooks observe the resulting semantic response, whether it came from that short circuit or the PouchDB operation, and may transform it.
 
-The public parameter vocabulary is `database`, `documentId`, `designId`, `attachmentId`, and `localId`. For a design-document path, `documentId` is reconstructed as `_design/…`. `attachmentId` preserves all `/` segments in the attachment name.
-
-A `before` hook may mutate `database`, `params`, `query`, `body`, and `state`. `db` and `response` are absent during `before`. Returning `undefined` preserves the context and its mutations. Returning a semantic response stops the remaining `before` hooks and the PouchDB operation; `db` remains absent and all `after` hooks still run. When a `before` hook changes the database or another target parameter, application authorization must apply to that final target.
-
-Hook responses have the form `{ status, headers?, body? }`, with `status` required. Objects, arrays, and `null` bodies are serialized as JSON; a `Buffer` body is emitted as binary; a string body is emitted as text/raw content; and `undefined` emits no body.
-
-Expected PouchDB errors reach `after` as semantic responses. Each `after` hook observes the final context values and current response and may mutate both `state` and the response directly. If the hook returns `undefined`, those mutations persist. If it returns a complete response, that response replaces the current response for subsequent `after` hooks.
-
-`committed` reports whether HTTP headers have already been sent and cannot be changed by replacing the response. When it is `false`, an `after` hook may replace status, headers, and body. When it is `true`, the committed status and headers cannot be replaced; the hook may change only the uncommitted payload in ways compatible with them, and an incompatible change is rejected. If a later error leaves no faithful HTTP response possible, the transport is terminated rather than pretending to emit a new HTTP status. `after` is not guaranteed for such a late transport failure or for client disconnection.
-
+Application policy, including authorization, must apply to the final target after any `before` transformations. A `before` refusal therefore prevents PouchDB access for that request.
 ### Request-size boundary
 
-The public `bodyLimit` option sets the per-request limit for parsed JSON and raw bodies and defaults to `64 MiB`. Exceeding it produces HTTP `413` before application hooks or PouchDB access for that request. Invalid `bodyLimit` configuration is rejected. No lower implicit parser default may silently replace the configured or default contract limit.
+The public `bodyLimit` option controls the per-request limit for bodies parsed by the router and defaults to `64 MiB`. Exceeding it produces HTTP `413` before application hooks or PouchDB access for that request. Invalid `bodyLimit` configuration is rejected. No lower implicit parsing limit may silently replace the configured or default contract limit.
 
 This default is not a PouchDB limit and does not guarantee that every valid document or replication batch can pass. A large `_bulk_docs` request or a base64-encoded attachment may require a higher configured limit, at a corresponding memory cost. A lower limit in the host application or reverse proxy may prevail.
 
 ## Public lifecycle
 
-`router.close()` begins asynchronous shutdown. Once shutdown begins, the router accepts no new request processing. It terminates or cancels active `_changes` handling as required, while allowing already-engaged non-`_changes` operations to finish.
+`router.close()` begins asynchronous shutdown. Once shutdown begins, the router accepts no new request processing. It terminates or cancels active long-lived `_changes` work as required, while allowing already-engaged non-`_changes` operations to finish.
 
-The router then closes its cached PouchDB handles. Completion of `router.close()` means those router-owned resources have been released. Shutdown does not destroy databases, close the HTTP server, or manage PouchDB handles owned by the application.
+Completion of `router.close()` means the router-owned PouchDB resources have been released. Shutdown does not destroy databases, close the HTTP server, or manage PouchDB handles owned by the application.
 
 ## Security boundary
 
