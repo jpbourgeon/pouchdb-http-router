@@ -92,6 +92,7 @@ The public context exposes `req`, immutable `operation`, `database`, `params`, `
 A hook may return `undefined` or a semantic response of the form `{ status, headers?, body? }`, with `status` required. The `after` hooks observe the resulting semantic response, whether it came from a `before` short circuit or the PouchDB operation, and may transform it. A complete response returned by `after` becomes the current response for subsequent `after` hooks.
 
 `committed` indicates that the HTTP status and headers are already fixed. When it is `false`, `after` may replace status, headers, and body. When it is `true`, status and headers cannot be replaced; `after` may change only payload not yet emitted and only in ways compatible with them. An incompatible change is rejected. If a late transport failure or client disconnection leaves no faithful semantic response possible, `after` is not guaranteed.
+
 ### Request-size boundary
 
 The public `bodyLimit` option controls the per-request limit for bodies parsed by the router and defaults to `64 MiB`. Exceeding it produces HTTP `413` before application hooks or PouchDB access for that request. Invalid `bodyLimit` configuration is rejected. No lower implicit parsing limit may silently replace the configured or default contract limit.
