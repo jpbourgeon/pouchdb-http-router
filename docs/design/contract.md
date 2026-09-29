@@ -88,6 +88,7 @@ V1 exposes ordered `before` and `after` hooks as trusted application extension p
 `before` runs after request parsing and before any PouchDB access for that request. It may transform the request context, including the database target and operation parameters, or return a response that short-circuits the remaining `before` hooks and the PouchDB operation. The `after` hooks observe the resulting semantic response, whether it came from that short circuit or the PouchDB operation, and may transform it.
 
 Application policy, including authorization, must apply to the final target after any `before` transformations. A `before` refusal therefore prevents PouchDB access for that request.
+
 ### Request-size boundary
 
 The public `bodyLimit` option controls the per-request limit for bodies parsed by the router and defaults to `64 MiB`. Exceeding it produces HTTP `413` before application hooks or PouchDB access for that request. Invalid `bodyLimit` configuration is rejected. No lower implicit parsing limit may silently replace the configured or default contract limit.
