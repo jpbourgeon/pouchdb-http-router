@@ -67,7 +67,7 @@ The public V1 storage boundary consists of:
 
 `databaseExists` does not create a database. It returns `false` only when absence is known. An inability to determine existence is an error and must not be converted into absence. The `name` passed to it is the final value of `context.database` after `before` hooks.
 
-The router does not discover every database by inspecting storage, maintain a universal database catalog, or compensate for inconsistent application knowledge. It coordinates requests handled by one router instance, but does not establish cross-process or external-creator coordination.
+The router does not discover every database by inspecting storage, maintain a universal database catalog, or compensate for inconsistent application knowledge. Concurrent creation of the same database is coordinated within one router instance: two concurrent `PUT /:database` requests handled by that instance must not both report `201`, and a concurrent read whose result depends on an in-progress creation waits for that outcome before determining existence. No cross-process or external-creator coordination is guaranteed.
 
 ### Bulk reads and fallback reads
 
@@ -87,11 +87,15 @@ V1 exposes ordered `before` and `after` hooks. Hooks may be asynchronous and are
 
 The context exposes `req`, the semantic `operation`, `database`, `params`, `query`, `body`, request-scoped `state`, `db`, `response`, and read-only `committed`; it does not expose the raw response or route declaration. The immutable operation identifier describes PouchDB semantics rather than a route spelling and is one of `database.info`, `database.create`, `changes.read`, `revisions.diff`, `documents.bulkRead`, `documents.bulkWrite`, `attachment.read`, `localDocument.read`, `localDocument.write`, or `document.read`.
 
+The public parameter vocabulary is `database`, `documentId`, `designId`, `attachmentId`, and `localId`. For a design-document path, `documentId` is reconstructed as `_design/…`. `attachmentId` preserves all `/` segments in the attachment name.
+
 A `before` hook may mutate `database`, `params`, `query`, `body`, and `state`. `db` and `response` are absent during `before`. Returning `undefined` preserves the context and its mutations. Returning a semantic response stops the remaining `before` hooks and the PouchDB operation; `db` remains absent and all `after` hooks still run. When a `before` hook changes the database or another target parameter, application authorization must apply to that final target.
 
-Hook responses have the form `{ status, headers?, body? }`, with `status` required. Expected PouchDB errors reach `after` as semantic responses. Each `after` hook observes the final context values and current response, may mutate `state`, and may replace the response for subsequent `after` hooks.
+Hook responses have the form `{ status, headers?, body? }`, with `status` required. Objects, arrays, and `null` bodies are serialized as JSON; a `Buffer` body is emitted as binary; a string body is emitted as text/raw content; and `undefined` emits no body.
 
-`committed` reports whether HTTP headers have already been sent and cannot be changed by replacing the response. When it is `false`, an `after` hook may replace status, headers, and body. When it is `true`, the hook cannot undo committed HTTP state and may change only the uncommitted payload in ways compatible with the sent status and headers; an incompatible change is rejected. `after` is not guaranteed after a late transport error or client disconnection.
+Expected PouchDB errors reach `after` as semantic responses. Each `after` hook observes the final context values and current response and may mutate both `state` and the response directly. If the hook returns `undefined`, those mutations persist. If it returns a complete response, that response replaces the current response for subsequent `after` hooks.
+
+`committed` reports whether HTTP headers have already been sent and cannot be changed by replacing the response. When it is `false`, an `after` hook may replace status, headers, and body. When it is `true`, the committed status and headers cannot be replaced; the hook may change only the uncommitted payload in ways compatible with them, and an incompatible change is rejected. If a later error leaves no faithful HTTP response possible, the transport is terminated rather than pretending to emit a new HTTP status. `after` is not guaranteed for such a late transport failure or for client disconnection.
 
 ### Request-size boundary
 
