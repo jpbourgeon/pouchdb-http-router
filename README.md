@@ -1,6 +1,6 @@
 # pouchdb-http-router
 
-`pouchdb-http-router` exposes the HTTP surface required by the PouchDB replicator to connect and synchronize two or more PouchDB nodes. It is not a general-purpose remote database API or a CouchDB-compatible server.
+`pouchdb-http-router` exposes the HTTP surface required by the PouchDB replicator to connect and synchronize two or more PouchDB nodes. It is not a general-purpose remote database API nor a CouchDB-compatible server.
 
 ## Why
 
@@ -14,13 +14,11 @@ Fidelity to the PouchDB replicator, bounded complexity, and end-to-end synchroni
 
 ## Status
 
-The design contract is published, but implementation and verification are still ongoing. The project remains under active development.
+The reference design is published, but implementation and verification are still ongoing. The project remains under active development.
 
 ## Documentation
 
 The authoritative design corpus is published in [`docs/design/`](docs/design/). It separates the contract, architecture, execution environment, and design decisions.
-
-The [design capture](.42p/cases/design/2026-09-28_pouchdb-http-router_design_capture_edit-0.12.md) preserves source and rationale material; it is not normative documentation.
 
 ## License
 
