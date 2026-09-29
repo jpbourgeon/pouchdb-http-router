@@ -65,7 +65,7 @@ The public V1 storage boundary consists of:
 - `PouchDB: PouchDBConstructor`, the constructor or preset used to open databases;
 - `databaseExists: (name: string) => boolean | Promise<boolean>`, the application's logical-existence predicate for the database namespace it exposes.
 
-`databaseExists` does not create a database. It returns `false` only when absence is known. An inability to determine existence is an error and must not be converted into absence.
+`databaseExists` does not create a database. It returns `false` only when absence is known. An inability to determine existence is an error and must not be converted into absence. The `name` passed to it is the final value of `context.database` after `before` hooks.
 
 The router does not discover every database by inspecting storage, maintain a universal database catalog, or compensate for inconsistent application knowledge. It coordinates requests handled by one router instance, but does not establish cross-process or external-creator coordination.
 
@@ -83,13 +83,15 @@ Checkpoint placement options and disabled checkpoints do not add routes beyond t
 
 ### Request hooks
 
-V1 exposes ordered `before` and `after` hooks. Hooks of each kind run sequentially in configuration order and share one request context. The router parses the request body before running `before` hooks. A `before` hook can therefore refuse a parsed request before any PouchDB access for that request, while a parsing failure occurs before the hook.
+V1 exposes ordered `before` and `after` hooks. Hooks may be asynchronous and are awaited sequentially in configuration order. They share one request context. The router parses the request body before running `before` hooks. A `before` hook can therefore refuse a parsed request before any PouchDB access for that request, while a parsing failure occurs before the hook.
 
-The context exposes the request, the semantic `operation`, the database name, route parameters, query parameters, parsed body, request-scoped `state`, the PouchDB handle when one was used, the current `response`, and read-only `committed` state. The operation identifier describes PouchDB semantics rather than a route spelling and is one of `database.info`, `database.create`, `changes.read`, `revisions.diff`, `documents.bulkRead`, `documents.bulkWrite`, `attachment.read`, `localDocument.read`, `localDocument.write`, or `document.read`.
+The context exposes `req`, the semantic `operation`, `database`, `params`, `query`, `body`, request-scoped `state`, `db`, `response`, and read-only `committed`; it does not expose the raw response or route declaration. The immutable operation identifier describes PouchDB semantics rather than a route spelling and is one of `database.info`, `database.create`, `changes.read`, `revisions.diff`, `documents.bulkRead`, `documents.bulkWrite`, `attachment.read`, `localDocument.read`, `localDocument.write`, or `document.read`.
 
-A `before` hook may mutate the database name, route parameters, query parameters, body, and `state`. Returning a response stops the remaining `before` hooks and the PouchDB operation; all `after` hooks still run. When a `before` hook changes the database or another target parameter, application authorization must apply to that final target.
+A `before` hook may mutate `database`, `params`, `query`, `body`, and `state`. `db` and `response` are absent during `before`. Returning `undefined` preserves the context and its mutations. Returning a semantic response stops the remaining `before` hooks and the PouchDB operation; `db` remains absent and all `after` hooks still run. When a `before` hook changes the database or another target parameter, application authorization must apply to that final target.
 
-An `after` hook observes the final context values and may mutate `state` or replace the current response for subsequent `after` hooks. `committed` reports whether HTTP headers have already been sent. It is read-only: an `after` hook cannot undo committed HTTP state, and any response change must remain compatible with that state.
+Hook responses have the form `{ status, headers?, body? }`, with `status` required. Expected PouchDB errors reach `after` as semantic responses. Each `after` hook observes the final context values and current response, may mutate `state`, and may replace the response for subsequent `after` hooks.
+
+`committed` reports whether HTTP headers have already been sent and cannot be changed by replacing the response. When it is `false`, an `after` hook may replace status, headers, and body. When it is `true`, the hook cannot undo committed HTTP state and may change only the uncommitted payload in ways compatible with the sent status and headers; an incompatible change is rejected. `after` is not guaranteed after a late transport error or client disconnection.
 
 ### Request-size boundary
 
